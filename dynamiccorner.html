@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zone-based Scroll Transition Demo (with Indicator on Top)</title>
+    <style>
+      /* Full viewport and disable native scrolling */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
+      /* Page container holds 4 pages (each 100vw wide) */
+      #page-container {
+        width: 400vw;
+        height: 100vh;
+        display: flex;
+        transition: transform 1s ease-in-out;
+      }
+      .page {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+      }
+      /* Four pages with white backgrounds */
+      #page1, #page2, #page3, #page4 {
+        background-color: white;
+      }
+      /* Centered info text */
+      .info {
+        position: absolute;
+        top: 10%;
+        width: 100%;
+        text-align: center;
+        font-family: sans-serif;
+        color: black;
+      }
+      /* Navigation container ("dynamic corner") */
+      #nav-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 500px; /* visible mask width */
+        height: 100px; /* visible mask height */
+        overflow: hidden;
+        /* Soft horizontal opacity gradient:
+           Fully transparent at 0px and 500px,
+           fully opaque between 50px and 450px.
+        */
+        -webkit-mask-image: linear-gradient(to right, transparent 0px, black 50px, black 450px, transparent 500px);
+        mask-image: linear-gradient(to right, transparent 0px, black 50px, black 450px, transparent 500px);
+        background-color: transparent;
+      }
+      /* The dynamic long image */
+      #nav-container img {
+        position: absolute;
+        height: 275%;
+        bottom: 0;
+        left: 0;
+        transform: translateX(0px);
+        user-select: none;
+        pointer-events: none;
+        display: block;
+      }
+      /* Indicator: numbers 1,2,3 placed 10px above the nav-container's top right corner */
+      #indicator {
+        position: fixed;
+        /* The nav-container's top-right coordinate is at:
+           left: 500px, top: 0 (of the viewport).
+           We want the indicator 10px above that, so top: 10px; and right:
+           (viewport width - (nav-container's right edge + 10px)).
+           Assuming viewport width = 100vw, we can calculate:
+           right: calc(100vw - 500px - 10px);
+        */
+        bottom: 95px;
+        left: 500px;
+        z-index: 20;
+        display: flex;
+        gap: 5px;
+      }
+      #indicator span {
+        font-family: sans-serif;
+        font-size: 10px;
+        color: black;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Page container with 4 pages -->
+    <div id="page-container">
+      <div id="page1" class="page">
+        <div class="info">
+          <h1>Page 1 (Green)</h1>
+          <p>Zone 1 (at 0 px). Scroll down 430 px to move to Zone 2.</p>
+        </div>
+      </div>
+      <div id="page2" class="page">
+        <div class="info">
+          <h1>Page 2 (Orange)</h1>
+          <p>Zone 2 (at -430 px). Scroll down to move to Zone 3.</p>
+        </div>
+      </div>
+      <div id="page3" class="page">
+        <div class="info">
+          <h1>Page 3 (Blue)</h1>
+          <p>Zone 3 (at -3075 px). Scroll down 845 px to move to Zone 4.</p>
+        </div>
+      </div>
+      <div id="page4" class="page">
+        <div class="info">
+          <h1>Page 4 (Red)</h1>
+          <p>Zone 4 (at -3920 px). Scroll up to go back.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation element: dynamic long image -->
+    <div id="nav-container">
+      <!-- Replace with your long image URL -->
+      <img id="nav-img" src="image/dynamiccorner.png" alt="Navigation Image" />
+    </div>
+    
+    <!-- Indicator placed above the nav-container -->
+    <div id="indicator">
+      <span>1</span>
+      <span>2</span>
+      <span>3</span>
+    </div>
+
+    <script>
+      // Define zones (all negative for movement to the left)
+      // Zones: [0, -430, -3075, -3920]
+      const zones = [0, -430, -3075, -3920];
+      
+      // Current zone index (0-based)
+      let currentZoneIndex = 0;
+      // For duration adjustment comparison.
+      let previousZoneIndex = 0;
+      // Accumulator for fixed scroll step.
+      let scrollAccumulator = 0;
+      // Scrolling disabled flag (during transition)
+      let scrollingDisabled = false;
+      // Constant scroll step per wheel event.
+      const step = 50;
+      // Default transition duration (ms)
+      const defaultDuration = 1000;
+      
+      // DOM elements.
+      const pageContainer = document.getElementById("page-container");
+      const navImg = document.getElementById("nav-img");
+      
+      document.addEventListener("wheel", (e) => {
+        if (scrollingDisabled) return;
+        e.preventDefault();
+        
+        // Increase sensitivity for mouse wheel events.
+        let effectiveStep = step;
+        if (e.deltaMode === 1) {
+          effectiveStep = step * 2;
+        }
+        
+        if (e.deltaY > 0) {
+          if (currentZoneIndex < zones.length - 1) {
+            scrollAccumulator += effectiveStep;
+          }
+        }
+        else if (e.deltaY < 0) {
+          if (currentZoneIndex > 0) {
+            scrollAccumulator -= effectiveStep;
+          }
+        }
+        
+        // Calculate required scroll for transition; allow special factor for zone 2→3.
+        let required = 0;
+        if (e.deltaY > 0) {
+          const diff = Math.abs(zones[currentZoneIndex + 1] - zones[currentZoneIndex]);
+          // If transitioning from Zone 2 (index 1) to Zone 3 (index 2), reduce the required scroll.
+          if (currentZoneIndex === 1) {
+            required = diff * 0.2; // Only 20% of the difference required.
+          } else {
+            required = diff;
+          }
+          if (scrollAccumulator >= required) {
+            scrollingDisabled = true;
+            previousZoneIndex = currentZoneIndex;
+            currentZoneIndex++;
+            scrollAccumulator = 0;
+            pageContainer.style.transform = `translateX(-${currentZoneIndex * 100}vw)`;
+            let duration = defaultDuration;
+            if ((previousZoneIndex === 1 && currentZoneIndex === 2) ||
+                (previousZoneIndex === 2 && currentZoneIndex === 1)) {
+              duration = 3000;
+            }
+            triggerTransition(zones[currentZoneIndex], duration);
+          }
+        }
+        else if (e.deltaY < 0) {
+          const diff = Math.abs(zones[currentZoneIndex] - zones[currentZoneIndex - 1]);
+          if (currentZoneIndex === 2) {
+            required = diff * 0.2;
+          } else {
+            required = diff;
+          }
+          if (Math.abs(scrollAccumulator) >= required) {
+            scrollingDisabled = true;
+            previousZoneIndex = currentZoneIndex;
+            currentZoneIndex--;
+            scrollAccumulator = 0;
+            pageContainer.style.transform = `translateX(-${currentZoneIndex * 100}vw)`;
+            let duration = defaultDuration;
+            if ((previousZoneIndex === 2 && currentZoneIndex === 1) ||
+                (previousZoneIndex === 1 && currentZoneIndex === 2)) {
+              duration = 3000;
+            }
+            triggerTransition(zones[currentZoneIndex], duration);
+          }
+        }
+      }, { passive: false });
+      
+      function triggerTransition(targetX, duration) {
+        navImg.style.transition = `transform ${duration}ms`;
+        navImg.style.transform = `translateX(${targetX}px)`;
+        setTimeout(() => {
+          navImg.style.transition = "";
+          scrollingDisabled = false;
+        }, duration);
+      }
+    </script>
+  </body>
+</html>
