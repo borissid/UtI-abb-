@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Zone-based Scroll Transition Demo (with Indicator on Top)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page-based Scroll Transition Demo with Mobile Support</title>
     <style>
       /* Full viewport and disable native scrolling */
       html,
@@ -13,21 +14,18 @@
         height: 100vh;
         overflow: hidden;
       }
-      /* Page container holds 4 pages (each 100vw wide) */
+      /* Page container holds 30 pages (each 100vw wide) */
       #page-container {
-        width: 400vw;
+        width: 3000vw;
         height: 100vh;
         display: flex;
-        transition: transform 1s ease-in-out;
+        transition: transform 0.5s ease-in-out;
       }
       .page {
         width: 100vw;
         height: 100vh;
         position: relative;
-      }
-      /* Four pages with white backgrounds */
-      #page1, #page2, #page3, #page4 {
-        background-color: white;
+        background-color: #f0f0f0; /* Light grey background */
       }
       /* Centered info text */
       .info {
@@ -65,16 +63,9 @@
         pointer-events: none;
         display: block;
       }
-      /* Indicator: numbers 1,2,3 placed 10px above the nav-container's top right corner */
+      /* Indicator: page number display */
       #indicator {
         position: fixed;
-        /* The nav-container's top-right coordinate is at:
-           left: 500px, top: 0 (of the viewport).
-           We want the indicator 10px above that, so top: 10px; and right:
-           (viewport width - (nav-container's right edge + 10px)).
-           Assuming viewport width = 100vw, we can calculate:
-           right: calc(100vw - 500px - 10px);
-        */
         bottom: 95px;
         left: 500px;
         z-index: 20;
@@ -83,38 +74,82 @@
       }
       #indicator span {
         font-family: sans-serif;
-        font-size: 10px;
+        font-size: 14px;
         color: black;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 5px;
+        border-radius: 5px;
+      }
+      /* Current page and zone display */
+      #page-info {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 30;
+        font-family: sans-serif;
+        font-size: 14px;
+        color: black;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 5px;
+        border-radius: 5px;
+      }
+      /* Image position display */
+      #image-position {
+        position: fixed;
+        top: 40px;
+        right: 10px;
+        z-index: 30;
+        font-family: sans-serif;
+        font-size: 14px;
+        color: black;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 5px;
+        border-radius: 5px;
+      }
+      
+      /* Mobile-specific styles */
+      @media (max-width: 768px) {
+        /* Center the navigation container on mobile */
+        #nav-container {
+          left: 50%;
+          transform: translateX(-50%);
+          width: 300px; /* Smaller width for mobile */
+          height: 80px; /* Smaller height for mobile */
+          -webkit-mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
+          mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
+        }
+        
+        /* Adjust the indicator position for mobile */
+        #indicator {
+          bottom: 75px;
+          left: 50%;
+          transform: translateX(150px); /* Half of nav-container width */
+        }
+        
+        /* Make info text more readable on mobile */
+        .info {
+          top: 5%;
+          font-size: 0.9em;
+        }
+        
+        /* Adjust the info displays for mobile */
+        #page-info, #image-position {
+          font-size: 12px;
+          padding: 3px;
+        }
+        
+        /* Important: Don't transform the container itself on mobile, 
+           but allow the image inside to move */
+        #nav-container img {
+          /* No specific mobile styling here - will be controlled by JS */
+        }
       }
     </style>
   </head>
   <body>
-    <!-- Page container with 4 pages -->
+    <!-- Page container with 30 pages -->
     <div id="page-container">
-      <div id="page1" class="page">
-        <div class="info">
-          <h1>Page 1 (Green)</h1>
-          <p>Zone 1 (at 0 px). Scroll down 430 px to move to Zone 2.</p>
-        </div>
-      </div>
-      <div id="page2" class="page">
-        <div class="info">
-          <h1>Page 2 (Orange)</h1>
-          <p>Zone 2 (at -430 px). Scroll down to move to Zone 3.</p>
-        </div>
-      </div>
-      <div id="page3" class="page">
-        <div class="info">
-          <h1>Page 3 (Blue)</h1>
-          <p>Zone 3 (at -3075 px). Scroll down 845 px to move to Zone 4.</p>
-        </div>
-      </div>
-      <div id="page4" class="page">
-        <div class="info">
-          <h1>Page 4 (Red)</h1>
-          <p>Zone 4 (at -3920 px). Scroll up to go back.</p>
-        </div>
-      </div>
+      <!-- Pages will be generated by JavaScript -->
     </div>
 
     <!-- Navigation element: dynamic long image -->
@@ -125,109 +160,246 @@
     
     <!-- Indicator placed above the nav-container -->
     <div id="indicator">
-      <span>1</span>
-      <span>2</span>
-      <span>3</span>
+      <span id="page-number">Page 1 / 30</span>
     </div>
 
+    <!-- Page and zone info display -->
+    <div id="page-info">Page: 1, Zone: 1</div>
+    
+    <!-- Image position display -->
+    <div id="image-position">Image Position: 0px</div>
+
     <script>
-      // Define zones (all negative for movement to the left)
-      // Zones: [0, -430, -3075, -3920]
-      const zones = [0, -430, -3075, -3920];
+      // Generate 30 pages dynamically
+      const pageContainer = document.getElementById("page-container");
+      for (let i = 1; i <= 30; i++) {
+        const page = document.createElement("div");
+        page.id = `page${i}`;
+        page.className = "page";
+        page.innerHTML = `
+          <div class="info">
+            <h1>Page ${i}</h1>
+            <p>Scroll to navigate between pages</p>
+          </div>
+        `;
+        pageContainer.appendChild(page);
+      }
       
+      // Define the main zone positions (anchor points)
+      const zonePositions = [0, -430, -3075, -3920];
+      
+      // Map pages to zones (which pages belong to which zone)
+      const pageToZoneMap = {
+        // Pages 1-7 are in zone 1
+        1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0,
+        // Pages 8-15 are in zone 2
+        8: 1, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1,
+        // Pages 16-25 are in zone 3
+        16: 2, 17: 2, 18: 2, 19: 2, 20: 2, 21: 2, 22: 2, 23: 2, 24: 2, 25: 2,
+        // Pages 26-30 are in zone 4
+        26: 3, 27: 3, 28: 3, 29: 3, 30: 3
+      };
+      
+      // Calculate incremental positions for each page within zones
+      const pagePositions = {};
+      
+      // Maximum percentage toward next zone (40%)
+      const MAX_ZONE_PROGRESS = 0.4;
+      
+      // For each zone, calculate the incremental positions
+      for (let page = 1; page <= 30; page++) {
+        const zoneIndex = pageToZoneMap[page];
+        
+        // Find all pages in this zone
+        const pagesInZone = Object.entries(pageToZoneMap)
+          .filter(([_, zone]) => zone === zoneIndex)
+          .map(([p, _]) => parseInt(p));
+        
+        // Sort pages in zone
+        pagesInZone.sort((a, b) => a - b);
+        
+        // Find position of current page in the zone's page list
+        const positionInZone = pagesInZone.indexOf(page);
+        const totalPagesInZone = pagesInZone.length;
+        
+        // Get zone boundaries
+        const zoneStart = zonePositions[zoneIndex];
+        const zoneEnd = zoneIndex < zonePositions.length - 1 ? 
+                        zonePositions[zoneIndex + 1] : 
+                        zonePositions[zoneIndex] - 100; // Just some extra space for last zone
+        
+        // Calculate the range for this zone
+        const zoneRange = Math.abs(zoneEnd - zoneStart);
+        
+        // Calculate incremental position
+        // First page in zone is at zone start, last page is 40% toward next zone
+        const incrementFactor = totalPagesInZone > 1 ? positionInZone / (totalPagesInZone - 1) * MAX_ZONE_PROGRESS : 0;
+        
+        // For forward zones (negative positions), we subtract the increment
+        pagePositions[page] = zoneStart - (incrementFactor * zoneRange);
+      }
+      
+      // Current page (1-based)
+      let currentPage = 1;
       // Current zone index (0-based)
       let currentZoneIndex = 0;
-      // For duration adjustment comparison.
-      let previousZoneIndex = 0;
-      // Accumulator for fixed scroll step.
-      let scrollAccumulator = 0;
+      // Current image position
+      let currentImagePosition = 0;
       // Scrolling disabled flag (during transition)
       let scrollingDisabled = false;
-      // Constant scroll step per wheel event.
-      const step = 50;
       // Default transition duration (ms)
       const defaultDuration = 1000;
       
-      // DOM elements.
-      const pageContainer = document.getElementById("page-container");
+      // DOM elements
       const navImg = document.getElementById("nav-img");
+      const navContainer = document.getElementById("nav-container");
+      const pageNumber = document.getElementById("page-number");
+      const pageInfo = document.getElementById("page-info");
+      const imagePosition = document.getElementById("image-position");
       
-      document.addEventListener("wheel", (e) => {
+      // Check if device is mobile
+      const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
+      
+      // Handle navigation image positioning for mobile
+      function updateImagePositionForDevice(targetX) {
+        if (isMobile()) {
+          // On mobile, we need to position the image inside the centered container
+          navImg.style.transform = `translateX(${targetX}px)`;
+        } else {
+          // On desktop, use the calculated position
+          navImg.style.transform = `translateX(${targetX}px)`;
+        }
+      }
+      
+      // Handle both wheel and touch events
+      function setupEventListeners() {
+        // Mouse wheel event for desktop
+        document.addEventListener("wheel", handleScrollEvent, { passive: false });
+        
+        // Touch events for mobile
+        let touchStartY = 0;
+        let touchEndY = 0;
+        
+        document.addEventListener("touchstart", (e) => {
+          touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+        
+        document.addEventListener("touchend", (e) => {
+          if (scrollingDisabled) return;
+          
+          touchEndY = e.changedTouches[0].screenY;
+          const deltaY = touchStartY - touchEndY;
+          
+          // Simulate wheel event with touch delta
+          if (Math.abs(deltaY) > 30) { // Threshold to avoid small swipes
+            handleScrollEvent({ 
+              preventDefault: () => {}, 
+              deltaY: deltaY,
+              deltaMode: 0
+            });
+          }
+        }, { passive: true });
+      }
+      
+      // Handle scroll/swipe events
+      function handleScrollEvent(e) {
         if (scrollingDisabled) return;
-        e.preventDefault();
         
-        // Increase sensitivity for mouse wheel events.
-        let effectiveStep = step;
-        if (e.deltaMode === 1) {
-          effectiveStep = step * 2;
+        if (!e.deltaMode) { // Not from a touch event that needs preventDefault
+          e.preventDefault();
         }
         
-        if (e.deltaY > 0) {
-          if (currentZoneIndex < zones.length - 1) {
-            scrollAccumulator += effectiveStep;
-          }
-        }
-        else if (e.deltaY < 0) {
-          if (currentZoneIndex > 0) {
-            scrollAccumulator -= effectiveStep;
-          }
+        const previousPage = currentPage;
+        const previousZone = currentZoneIndex;
+        
+        // Update current page based on scroll direction
+        if (e.deltaY > 0 && currentPage < 30) {
+          currentPage++;
+        } else if (e.deltaY < 0 && currentPage > 1) {
+          currentPage--;
         }
         
-        // Calculate required scroll for transition; allow special factor for zone 2→3.
-        let required = 0;
-        if (e.deltaY > 0) {
-          const diff = Math.abs(zones[currentZoneIndex + 1] - zones[currentZoneIndex]);
-          // If transitioning from Zone 2 (index 1) to Zone 3 (index 2), reduce the required scroll.
-          if (currentZoneIndex === 1) {
-            required = diff * 0.2; // Only 20% of the difference required.
-          } else {
-            required = diff;
-          }
-          if (scrollAccumulator >= required) {
-            scrollingDisabled = true;
-            previousZoneIndex = currentZoneIndex;
-            currentZoneIndex++;
-            scrollAccumulator = 0;
-            pageContainer.style.transform = `translateX(-${currentZoneIndex * 100}vw)`;
-            let duration = defaultDuration;
-            if ((previousZoneIndex === 1 && currentZoneIndex === 2) ||
-                (previousZoneIndex === 2 && currentZoneIndex === 1)) {
-              duration = 3000;
+        // If page changed, update the display
+        if (previousPage !== currentPage) {
+          scrollingDisabled = true;
+          
+          // Update page container position
+          pageContainer.style.transform = `translateX(-${(currentPage - 1) * 100}vw)`;
+          
+          // Update page number display
+          pageNumber.textContent = `Page ${currentPage} / 30`;
+          
+          // Get the zone for the current page
+          const newZoneIndex = pageToZoneMap[currentPage];
+          
+          // Update zone info
+          pageInfo.textContent = `Page: ${currentPage}, Zone: ${newZoneIndex + 1}`;
+          
+          // Get the target position for the current page
+          const targetPosition = pagePositions[currentPage];
+          currentImagePosition = targetPosition;
+          
+          // Update image position display
+          imagePosition.textContent = `Image Position: ${Math.round(targetPosition)}px`;
+          
+          // Determine transition duration based on zone change
+          let duration = 500; // Default for same-zone transitions
+          
+          if (newZoneIndex !== previousZone) {
+            currentZoneIndex = newZoneIndex;
+            duration = defaultDuration; // Default for zone transitions
+            
+            // Special case for transition between zones 2 and 3
+            if ((previousZone === 1 && newZoneIndex === 2) ||
+                (previousZone === 2 && newZoneIndex === 1)) {
+              duration = 3000; // Longer transition between zones 2 and 3
             }
-            triggerTransition(zones[currentZoneIndex], duration);
           }
+          
+          // Trigger image transition to the new position
+          triggerTransition(targetPosition, duration);
         }
-        else if (e.deltaY < 0) {
-          const diff = Math.abs(zones[currentZoneIndex] - zones[currentZoneIndex - 1]);
-          if (currentZoneIndex === 2) {
-            required = diff * 0.2;
-          } else {
-            required = diff;
-          }
-          if (Math.abs(scrollAccumulator) >= required) {
-            scrollingDisabled = true;
-            previousZoneIndex = currentZoneIndex;
-            currentZoneIndex--;
-            scrollAccumulator = 0;
-            pageContainer.style.transform = `translateX(-${currentZoneIndex * 100}vw)`;
-            let duration = defaultDuration;
-            if ((previousZoneIndex === 2 && currentZoneIndex === 1) ||
-                (previousZoneIndex === 1 && currentZoneIndex === 2)) {
-              duration = 3000;
-            }
-            triggerTransition(zones[currentZoneIndex], duration);
-          }
-        }
-      }, { passive: false });
+      }
       
       function triggerTransition(targetX, duration) {
+        // Apply transition to the image
         navImg.style.transition = `transform ${duration}ms`;
+        
+        // Apply the transform to the image directly
         navImg.style.transform = `translateX(${targetX}px)`;
+        
+        // Update position display
+        imagePosition.textContent = `Image Position: ${Math.round(targetX)}px`;
+        
         setTimeout(() => {
           navImg.style.transition = "";
           scrollingDisabled = false;
         }, duration);
       }
+      
+      // Initialize event listeners
+      setupEventListeners();
+      
+      // Handle window resize to update mobile/desktop mode
+      window.addEventListener("resize", () => {
+        // Reset any container transforms that might have been applied
+        if (isMobile()) {
+          navContainer.style.transform = "translateX(-50%)";
+        } else {
+          navContainer.style.transform = "";
+        }
+        
+        // Update image position based on current page
+        updateImagePositionForDevice(currentImagePosition);
+      });
+      
+      // Initial setup
+      window.addEventListener("load", () => {
+        // Set initial container position for mobile
+        if (isMobile()) {
+          navContainer.style.transform = "translateX(-50%)";
+        }
+      });
     </script>
   </body>
 </html>
