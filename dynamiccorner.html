@@ -19,7 +19,7 @@
       }
       /* Page container holds 30 pages (each 100vw wide) */
       #page-container {
-        width: 3000vw;
+        width: 2300vw; /* Updated for 23 pages */
         height: 100vh;
         display: flex;
         transition: transform 0.5s ease-out; /* Simplified easing */
@@ -197,7 +197,7 @@
           left: 50%;
           transform: translateX(-50%);
           width: 300px; /* Smaller width for mobile */
-          height: 160px; /* Increased height for mobile */
+          height: 200px; /* Increased height for mobile */
           -webkit-mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
           mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
         }
@@ -263,7 +263,7 @@
     <div class="debug-elements debug-hidden">
       <!-- Indicator placed above the nav-container -->
       <div id="indicator">
-        <span id="page-number">Page 1 / 30</span>
+        <span id="page-number">Page 1 / 23</span>  <!-- Updated page count to 23 -->
       </div>
 
       <!-- Page and zone info display -->
@@ -276,7 +276,7 @@
     <script>
       // Generate 30 pages dynamically
       const pageContainer = document.getElementById("page-container");
-      for (let i = 1; i <= 30; i++) {
+      for (let i = 1; i <= 23; i++) { // Updated loop to 23 pages
         const page = document.createElement("div");
         page.id = `page${i}`;
         page.className = "page";
@@ -290,18 +290,18 @@
       }
       
       // Define the main zone positions (anchor points)
-      const zonePositions = [0, -1200, -5050, -6400];
+      const zonePositions = [0, -1200, -6400, -8000];
       
       // Map pages to zones (which pages belong to which zone)
       const pageToZoneMap = {
-        // Pages 1-7 are in zone 1
-        1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0,
-        // Pages 8-15 are in zone 2
-        12: 1, 13: 1, 14: 1, 15: 1,
-        // Pages 16-25 are in zone 3
-        16: 2, 17: 2, 18: 2, 
-        // Pages 26-30 are in zone 4
-        19: 2, 20: 2, 21: 2, 22: 2, 23: 2
+        // Pages 1-11 are in zone 1  (Adjusted zone 1 to have more pages)
+        1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 
+        // Pages 12-15 are in zone 2 (Zone 2 remains the same)
+        9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1,
+        // Pages 16-18 are in zone 3 (Reduced zone 3 significantly)
+        16: 2, 17: 2, 18: 2,
+        // Pages 19-23 are in zone 4 (Zone 4 now has pages up to 23)
+        19: 3, 20: 3, 21: 3, 22: 3, 23: 3 
       };
       
       // Define zone-specific text
@@ -316,7 +316,7 @@
       const pagePositions = {};
       
       // For each zone, calculate positions with equal spacing
-      for (let page = 1; page <= 30; page++) {
+      for (let page = 1; page <= 23; page++) { // Updated loop to 23 pages
         const zoneIndex = pageToZoneMap[page];
         
         // Find all pages in this zone
@@ -350,7 +350,7 @@
         if (pageParam) {
           const pageNumber = parseInt(pageParam, 10);
           // Validate page number is in range
-          if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= 30) {
+          if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= 23) { // Updated page count to 23
             return pageNumber;
           }
         }
@@ -453,7 +453,7 @@
         positionIndicators.innerHTML = '';
         
         // Create an indicator for each page
-        for (let page = 1; page <= 30; page++) {
+        for (let page = 1; page <= 23; page++) { // Updated loop to 23 pages
           const indicator = document.createElement("div");
           indicator.className = "position-indicator";
           indicator.id = `indicator-${page}`;
@@ -496,7 +496,7 @@
         if (scrollingDisabled || targetPage === currentPage) return;
         
         // Validate target page
-        targetPage = Math.max(1, Math.min(30, targetPage));
+        targetPage = Math.max(1, Math.min(23, targetPage)); // Updated page count to 23
         
         scrollingDisabled = true;
         
@@ -516,7 +516,7 @@
         pageContainer.style.transform = `translateX(-${(currentPage - 1) * 100}vw)`;
         
         // Update page number display
-        pageNumber.textContent = `Page ${currentPage} / 30`;
+        pageNumber.textContent = `Page ${currentPage} / 23`; // Updated page count to 23
         
         // Get the zone for the current page
         const newZoneIndex = pageToZoneMap[currentPage];
@@ -662,7 +662,7 @@
             
             // Limit pages to move based on available pages
             if (deltaX > 0) { // Swipe left (move forward)
-              pagesToMove = Math.min(pagesToMove, 30 - currentPage);
+              pagesToMove = Math.min(pagesToMove, 23 - currentPage); // Updated page count to 23
             } else { // Swipe right (move backward)
               pagesToMove = Math.min(pagesToMove, currentPage - 1);
             }
@@ -718,7 +718,7 @@
         const direction = deltaX > 0 ? 1 : -1; // 1 for forward, -1 for backward
         
         // Calculate target page
-        const targetPage = Math.max(1, Math.min(30, currentPage + (direction * pagesToMove)));
+        const targetPage = Math.max(1, Math.min(23, currentPage + (direction * pagesToMove))); // Updated page count to 23
         
         // If page would change, update everything
         if (targetPage !== currentPage) {
@@ -741,7 +741,7 @@
         // Calculate target page based on scroll direction
         let targetPage = currentPage;
         
-        if (e.deltaY > 0 && currentPage < 30) {
+        if (e.deltaY > 0 && currentPage < 23) { // Updated page count to 23
           targetPage = currentPage + 1;
         } else if (e.deltaY < 0 && currentPage > 1) {
           targetPage = currentPage - 1;
@@ -795,7 +795,7 @@
           positionIndicators.style.transform = `translateX(${pagePositions[currentPage]}px)`;
           
           // Update displays
-          pageNumber.textContent = `Page ${currentPage} / 30`;
+          pageNumber.textContent = `Page ${currentPage} / 23`; // Updated page count to 23
           pageInfo.textContent = `Page: ${currentPage}, Zone: ${currentZoneIndex + 1}`;
           imagePosition.textContent = `Image Position: ${Math.round(pagePositions[currentPage])}px`;
           
@@ -835,5 +835,3 @@
       // Initialize when the page loads
       window.addEventListener("load", initialize);
     </script>
-  </body>
-</html>
