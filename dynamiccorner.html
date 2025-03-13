@@ -1,282 +1,1166 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page-based Scroll Transition with Deep Linking</title>
-    <style>
-      /* Import a specific font */
-      @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
-      
-      /* Full viewport and disable native scrolling */
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        width: 100vw;
-        height: 100vh;
-        overflow: hidden;
-      }
-      /* Page container holds 30 pages (each 100vw wide) */
-      #page-container {
-        width: 2300vw; /* Updated for 23 pages */
-        height: 100vh;
-        display: flex;
-        transition: transform 0.5s ease-out; /* Simplified easing */
-        will-change: transform; /* Optimize for animations */
-      }
-      .page {
-        width: 100vw;
-        height: 100vh;
-        position: relative;
-        background-color: #f0f0f0; /* Light grey background */
-      }
-      /* Centered info text */
-      .info {
-        position: absolute;
-        top: 10%;
-        width: 100%;
-        text-align: center;
-        font-family: sans-serif;
-        color: black;
-        cursor: pointer; /* Indicate clickable */
-      }
-      /* Navigation container ("dynamic corner") */
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Navigation with Videos and Page Scrolling</title>
+  <style>
+    /* Import Roboto font */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
+
+    /* Full viewport and disable native scrolling */
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Roboto', sans-serif;
+      background-color: rgba(255, 255, 255, 0);
+    }
+
+    /* Canvas container for dots background */
+    #canvas-container {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      z-index: 1; /* Above body, below active views */
+      pointer-events: none;
+      display: none; /* Initially hidden */
+    }
+    
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* Controls for adjusting the grid */
+    #controls {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      z-index: 1001; /* Higher than other elements */
+      display: none; /* Initially hidden */
+    }
+    
+    #controls label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    
+    #controls input {
+      margin-bottom: 10px;
+      width: 100%;
+    }
+
+    /* Views container */
+    #views-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      z-index: 2; /* Above canvas container */
+    }
+
+    /* Individual view */
+    .view {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: none; /* All views are hidden by default */
+      z-index: 1;
+    }
+
+    /* Active view */
+    .view.active {
+      display: block;
+      z-index: 2;
+    }
+
+    /* Root view with videos */
+    #root-view {
+      background-color: #f8f8f800; /* Light gray background */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Internet Structure view - explicitly transparent */
+    #internetstructure-view {
+      background-color: transparent;
+    }
+
+    /* Counterculture view - explicitly transparent */
+    #counterculture-view {
+      background-color: transparent;
+    }
+
+    /* Videos container */
+    #videos-container {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      max-width: 800px;
+      padding: 20px;
+    }
+
+    /* Video container */
+    .video-container {
+      width: 300px;
+      height: 300px;
+      overflow: hidden;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      position: relative;
+      flex-shrink: 0;
+      background-color: #ddd; /* Light gray background as placeholder */
+    }
+
+    /* Video hover effect */
+    .video-container:hover {
+      transform: scale(1.1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Video */
+    .video-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Minimized video in corner */
+    .minimized-video {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 210px; /* 70% of 300px */
+      height: 210px; /* 70% of 300px */
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      cursor: pointer;
+      transition: all 0.5s ease;
+      overflow: hidden;
+      background-color: #ddd; /* Light gray background as placeholder */
+      opacity: 1;
+      display: none; /* Initially hidden */
+    }
+
+    .minimized-video:hover {
+      transform: scale(1.05);
+    }
+
+    .minimized-video video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Animation classes for video transition */
+    .video-animating {
+      position: fixed;
+      z-index: 1000;
+      transition: all 0.5s ease;
+    }
+
+    #counterculture-content {
+      text-align: center;
+      padding: 30px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Page container holds 23 pages (each 100vw wide) */
+    #page-container {
+      width: 2300vw; /* Updated for 23 pages */
+      height: 100vh;
+      display: flex;
+      transition: transform 0.5s ease-out; /* Simplified easing */
+      will-change: transform; /* Optimize for animations */
+      background-color: transparent;
+    }
+    .page {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      background-color: transparent; /* Transparent for dots background */
+    }
+    /* Centered info text */
+    .info {
+      position: absolute;
+      top: 10%;
+      width: 100%;
+      text-align: center;
+      font-family: sans-serif;
+      color: black;
+      cursor: pointer; /* Indicate clickable */
+      background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent white */
+      padding: 10px 0;
+    }
+    /* Navigation container ("dynamic corner") */
+    #nav-container {
+      position: fixed;
+      bottom: 40px;
+      left: 40px;
+      width: 500px; /* visible mask width */
+      height: 200px; /* Increased height to accommodate circles */
+      overflow: hidden;
+      /* Soft horizontal opacity gradient:
+         Fully transparent at 0px and 500px,
+         fully opaque between 50px and 450px.
+      */
+      -webkit-mask-image: linear-gradient(to right, transparent 0px, black 50px, black 450px, transparent 500px);
+      mask-image: linear-gradient(to right, transparent 0px, black 50px, black 450px, transparent 500px);
+      background-color: transparent;
+      z-index: 100; /* Ensure it's above other elements for touch events */
+      touch-action: none; /* Prevent browser handling of touch gestures */
+    }
+    
+    /* The dynamic long image */
+    #nav-container img {
+      position: absolute;
+      height: 275%;
+      bottom: 0;
+      left: 0;
+      transform: translateX(0px);
+      user-select: none;
+      pointer-events: none;
+      display: block;
+      will-change: transform; /* Optimize for animations */
+    }
+    
+    /* Text below the image container */
+    #nav-text-container {
+      position: fixed;
+      bottom: 30px; /* Positioned higher */
+      left: 50px;
+      width: 500px;
+      text-align: left;
+      z-index: 101;
+    }
+    
+    /* Text below the image */
+    .nav-text {
+      font-family: 'Roboto', sans-serif; /* Specific font declaration */
+      font-size: 14px;
+      color: #333;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+      background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent white */
+      padding: 5px;
+      border-radius: 3px;
+    }
+    
+    /* Hidden text state */
+    .nav-text.hidden {
+      opacity: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+    }
+    
+    /* Position indicators container - moves with the image */
+    #position-indicators {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 275%;
+      width: 100%;
+      transform: translateX(0px);
+      pointer-events: none;
+      z-index: 10;
+      will-change: transform; /* Optimize for animations */
+    }
+    /* Individual position indicator */
+    .position-indicator {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background-color: #cacaca; /* Soft grey color */
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: rgb(158, 158, 158);
+      font-family: sans-serif;
+      font-size: 12px;
+      font-weight: Medium;
+      /* Position will be set by JavaScript */
+    }
+    /* Current indicator highlight */
+    .position-indicator.current {
+      background-color: #000000; /* Orange-red for current page */
+      transform: scale(1.2);
+      color: rgb(255, 255, 255);
+    }
+    /* Indicator: page number display */
+    #indicator {
+      position: fixed;
+      bottom: 95px;
+      left: 500px;
+      z-index: 20;
+      display: flex;
+      gap: 5px;
+    }
+    #indicator span {
+      font-family: sans-serif;
+      font-size: 14px;
+      color: black;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 5px;
+      border-radius: 5px;
+    }
+    /* Current page and zone display */
+    #page-info {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 30;
+      font-family: sans-serif;
+      font-size: 14px;
+      color: black;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 5px;
+      border-radius: 5px;
+    }
+    /* Image position display */
+    #image-position {
+      position: fixed;
+      top: 40px;
+      right: 10px;
+      z-index: 30;
+      font-family: sans-serif;
+      font-size: 14px;
+      color: black;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 5px;
+      border-radius: 5px;
+    }
+    
+    /* Debug elements container */
+    .debug-elements {
+      transition: opacity 0.3s ease;
+    }
+    
+    /* Hidden debug elements */
+    .debug-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    /* Mobile-specific styles */
+    @media (max-width: 768px) {
+      /* Center the navigation container on mobile */
       #nav-container {
-        position: fixed;
-        bottom: 40px;
-        left: 40px;
-        width: 500px; /* visible mask width */
-        height: 200px; /* Increased height to accommodate circles */
-        overflow: hidden;
-        /* Soft horizontal opacity gradient:
-           Fully transparent at 0px and 500px,
-           fully opaque between 50px and 450px.
-        */
-        -webkit-mask-image: linear-gradient(to right, transparent 0px, black 50px, black 450px, transparent 500px);
-        mask-image: linear-gradient(to right, transparent 0px, black 50px, black 450px, transparent 500px);
-        background-color: transparent;
-        z-index: 100; /* Ensure it's above other elements for touch events */
-        touch-action: none; /* Prevent browser handling of touch gestures */
+        left: 50%;
+        transform: translateX(-50%);
+        width: 300px; /* Smaller width for mobile */
+        height: 200px; /* Increased height for mobile */
+        -webkit-mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
+        mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
       }
       
-      /* The dynamic long image */
-      #nav-container img {
-        position: absolute;
-        height: 275%;
-        bottom: 0;
-        left: 0;
-        transform: translateX(0px);
-        user-select: none;
-        pointer-events: none;
-        display: block;
-        will-change: transform; /* Optimize for animations */
-      }
-      
-      /* Text below the image container */
+      /* Text below the image on mobile */
       #nav-text-container {
-        position: fixed;
-        bottom: 30px; /* Positioned higher */
-        left: 50px;
-        width: 500px;
-        text-align: left;
-        z-index: 101;
+        width: 300px;
+        left: 50%;
+        transform: translateX(-50%);
       }
       
-      /* Text below the image */
-      .nav-text {
-        font-family: 'Roboto', sans-serif; /* Specific font declaration */
-        font-size: 14px;
-        color: #333;
-        opacity: 1;
-        transition: opacity 0.5s ease;
-      }
-      
-      /* Hidden text state */
-      .nav-text.hidden {
-        opacity: 0;
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-      }
-      
-      /* Position indicators container - moves with the image */
-      #position-indicators {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        height: 275%;
-        width: 100%;
-        transform: translateX(0px);
-        pointer-events: none;
-        z-index: 10;
-        will-change: transform; /* Optimize for animations */
-      }
-      /* Individual position indicator */
-      .position-indicator {
-        position: absolute;
-        width: 24px;
-        height: 24px;
-        background-color: #cacaca; /* Soft grey color */
-        border-radius: 50%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        color: rgb(158, 158, 158);
-        font-family: sans-serif;
-        font-size: 12px;
-        font-weight: Medium;
-        /* Position will be set by JavaScript */
-      }
-      /* Current indicator highlight */
-      .position-indicator.current {
-        background-color: #000000; /* Orange-red for current page */
-        transform: scale(1.2);
-        color: rgb(255, 255, 255);
-      }
-      /* Indicator: page number display */
+      /* Adjust the indicator position for mobile */
       #indicator {
-        position: fixed;
-        bottom: 95px;
-        left: 500px;
-        z-index: 20;
-        display: flex;
-        gap: 5px;
-      }
-      #indicator span {
-        font-family: sans-serif;
-        font-size: 14px;
-        color: black;
-        background-color: rgba(255, 255, 255, 0.8);
-        padding: 5px;
-        border-radius: 5px;
-      }
-      /* Current page and zone display */
-      #page-info {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        z-index: 30;
-        font-family: sans-serif;
-        font-size: 14px;
-        color: black;
-        background-color: rgba(255, 255, 255, 0.8);
-        padding: 5px;
-        border-radius: 5px;
-      }
-      /* Image position display */
-      #image-position {
-        position: fixed;
-        top: 40px;
-        right: 10px;
-        z-index: 30;
-        font-family: sans-serif;
-        font-size: 14px;
-        color: black;
-        background-color: rgba(255, 255, 255, 0.8);
-        padding: 5px;
-        border-radius: 5px;
+        bottom: 75px;
+        left: 50%;
+        transform: translateX(150px); /* Half of nav-container width */
       }
       
-      /* Debug elements container */
-      .debug-elements {
-        transition: opacity 0.3s ease;
+      /* Make info text more readable on mobile */
+      .info {
+        top: 5%;
+        font-size: 0.9em;
       }
       
-      /* Hidden debug elements */
-      .debug-hidden {
-        opacity: 0;
-        pointer-events: none;
+      /* Adjust the info displays for mobile */
+      #page-info, #image-position {
+        font-size: 12px;
+        padding: 3px;
       }
       
-      /* Mobile-specific styles */
-      @media (max-width: 768px) {
-        /* Center the navigation container on mobile */
-        #nav-container {
-          left: 50%;
-          transform: translateX(-50%);
-          width: 300px; /* Smaller width for mobile */
-          height: 200px; /* Increased height for mobile */
-          -webkit-mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
-          mask-image: linear-gradient(to right, transparent 0px, black 30px, black 270px, transparent 300px);
-        }
-        
-        /* Text below the image on mobile */
-        #nav-text-container {
-          width: 300px;
-          left: 50%;
-          transform: translateX(-50%);
-        }
-        
-        /* Adjust the indicator position for mobile */
-        #indicator {
-          bottom: 75px;
-          left: 50%;
-          transform: translateX(150px); /* Half of nav-container width */
-        }
-        
-        /* Make info text more readable on mobile */
-        .info {
-          top: 5%;
-          font-size: 0.9em;
-        }
-        
-        /* Adjust the info displays for mobile */
-        #page-info, #image-position {
-          font-size: 12px;
-          padding: 3px;
-        }
-        
-        /* Position indicators for mobile */
-        .position-indicator {
-          width: 20px;
-          height: 20px;
-          font-size: 10px;
-        }
+      /* Position indicators for mobile */
+      .position-indicator {
+        width: 20px;
+        height: 20px;
+        font-size: 10px;
       }
-    </style>
-  </head>
-  <body>
-    <!-- Page container with 30 pages -->
-    <div id="page-container">
-      <!-- Pages will be generated by JavaScript -->
-    </div>
 
-    <!-- Navigation element: dynamic long image -->
-    <div id="nav-container">
-      <!-- Replace with your long image URL -->
-      <img id="nav-img" src="image/dynamiccorner.png" alt="Navigation Image" />
-      
-      <!-- Position indicators container -->
-      <div id="position-indicators">
-        <!-- Indicators will be generated by JavaScript -->
+      /* Adjust videos container for mobile */
+      #videos-container {
+        flex-direction: column;
+        gap: 20px;
+        padding: 10px;
+      }
+
+      /* Smaller videos for mobile */
+      .video-container {
+        width: 250px;
+        height: 250px;
+      }
+
+      /* Smaller minimized video for mobile */
+      .minimized-video {
+        width: 175px;
+        height: 175px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Canvas container for dots background -->
+  <div id="canvas-container">
+    <canvas id="dotsCanvas"></canvas>
+  </div>
+  
+  <!-- Controls for adjusting the grid -->
+  <div id="controls">
+    <label for="dotSize">Dot Size: <span id="dotSizeValue">4</span>px</label>
+    <input type="range" id="dotSize" min="1" max="20" value="4">
+    
+    <label for="spacing">Spacing: <span id="spacingValue">40</span>px</label>
+    <input type="range" id="spacing" min="10" max="100" value="40">
+    
+    <label for="padding">Padding: <span id="paddingValue">40</span>px</label>
+    <input type="range" id="padding" min="0" max="100" value="40">
+    
+    <label for="dotColor">Dot Color:</label>
+    <input type="color" id="dotColor" value="#cccccc">
+  </div>
+
+  <div id="views-container">
+    <div id="root-view" class="view active">
+      <div id="videos-container">
+        <div id="video1" class="video-container">
+          <video loop muted playsinline>
+            <source src="video/video1.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        </div>
+
+        <!-- Video 2 container -->
+        <div id="video2" class="video-container">
+          <video loop muted playsinline>
+            <source src="video/video2.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        </div>
       </div>
     </div>
     
-    <!-- Text below the image container -->
-    <div id="nav-text-container">
-      <!-- Zone-specific text elements will be generated by JavaScript -->
-    </div>
-    
-    <!-- Debug elements that can be toggled -->
-    <div class="debug-elements debug-hidden">
-      <!-- Indicator placed above the nav-container -->
-      <div id="indicator">
-        <span id="page-number">Page 1 / 23</span>  <!-- Updated page count to 23 -->
+    <!-- Internet Structure view (formerly scrolling view) -->
+    <div id="internetstructure-view" class="view">
+      <!-- Page container with 23 pages -->
+      <div id="page-container">
+        <!-- Pages will be generated by JavaScript -->
       </div>
 
-      <!-- Page and zone info display -->
-      <div id="page-info">Page: 1, Zone: 1</div>
+      <!-- Navigation element: dynamic long image -->
+      <div id="nav-container">
+        <!-- Replace with your long image URL -->
+        <img id="nav-img" src="image/dynamiccorner.png" alt="Navigation Image" />
+        
+        <!-- Position indicators container -->
+        <div id="position-indicators">
+          <!-- Indicators will be generated by JavaScript -->
+        </div>
+      </div>
       
-      <!-- Image position display -->
-      <div id="image-position">Image Position: 0px</div>
-    </div>
+      <!-- Text below the image container -->
+      <div id="nav-text-container">
+        <!-- Zone-specific text elements will be generated by JavaScript -->
+      </div>
+      
+      <!-- Debug elements that can be toggled -->
+      <div class="debug-elements debug-hidden">
+        <!-- Indicator placed above the nav-container -->
+        <div id="indicator">
+          <span id="page-number">Page 1 / 23</span>
+        </div>
 
-    <script>
-      // Generate 30 pages dynamically
+        <!-- Page and zone info display -->
+        <div id="page-info">Page: 1, Zone: 1</div>
+        
+        <!-- Image position display -->
+        <div id="image-position">Image Position: 0px</div>
+      </div>
+    </div>
+    
+    <!-- Counterculture view (formerly placeholder view) -->
+    <div id="counterculture-view" class="view">
+      <div id="counterculture-content">
+        <h1>Counterculture</h1>
+        <p>This is the counterculture page for the second video's destination.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimized video container (initially hidden) -->
+  <div id="minimized-video" class="minimized-video">
+    <!-- Video will be cloned here -->
+  </div>
+
+  <script>
+    // Dots background code
+    // Get canvas and context
+    const canvas = document.getElementById('dotsCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Get controls
+    const dotSizeSlider = document.getElementById('dotSize');
+    const dotSizeValue = document.getElementById('dotSizeValue');
+    const spacingSlider = document.getElementById('spacing');
+    const spacingValue = document.getElementById('spacingValue');
+    const paddingSlider = document.getElementById('padding');
+    const paddingValue = document.getElementById('paddingValue');
+    const dotColorPicker = document.getElementById('dotColor');
+    
+    // Default values
+    let dotSize = parseInt(dotSizeSlider.value);
+    let spacing = parseInt(spacingSlider.value);
+    let padding = parseInt(paddingSlider.value);
+    let dotColor = dotColorPicker.value;
+    
+    // Update values when controls change
+    dotSizeSlider.addEventListener('input', function() {
+      dotSize = parseInt(this.value);
+      dotSizeValue.textContent = dotSize;
+      drawDots();
+    });
+    
+    spacingSlider.addEventListener('input', function() {
+      spacing = parseInt(this.value);
+      spacingValue.textContent = spacing;
+      drawDots();
+    });
+    
+    paddingSlider.addEventListener('input', function() {
+      padding = parseInt(this.value);
+      paddingValue.textContent = padding;
+      drawDots();
+    });
+    
+    dotColorPicker.addEventListener('input', function() {
+      dotColor = this.value;
+      drawDots();
+    });
+    
+    // Resize canvas to fill window
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawDots();
+    }
+    
+    // Draw dots in a grid pattern
+    function drawDots() {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Calculate number of dots that fit in the canvas
+      const numDotsX = Math.floor((canvas.width - (padding * 2)) / spacing) + 1;
+      const numDotsY = Math.floor((canvas.height - (padding * 2)) / spacing) + 1;
+      
+      // Calculate actual padding to center the grid
+      const actualPaddingX = (canvas.width - ((numDotsX - 1) * spacing)) / 2;
+      const actualPaddingY = (canvas.height - ((numDotsY - 1) * spacing)) / 2;
+      
+      // Draw dots
+      ctx.fillStyle = dotColor;
+      
+      for (let y = 0; y < numDotsY; y++) {
+        for (let x = 0; x < numDotsX; x++) {
+          const xPos = actualPaddingX + (x * spacing);
+          const yPos = actualPaddingY + (y * spacing);
+          
+          ctx.beginPath();
+          ctx.arc(xPos, yPos, dotSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    
+    // Handle window resize
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Show/hide dots background and controls
+    function toggleDotsControls(view) {
+      const controls = document.getElementById('controls');
+      const canvasContainer = document.getElementById('canvas-container');
+      
+      if (view === 'root') {
+        // Hide dots background and controls in root view
+        controls.style.display = 'none';
+        canvasContainer.style.display = 'none';
+      } else {
+        // Show dots background and controls in other views
+        controls.style.display = 'block';
+        canvasContainer.style.display = 'block';
+        
+        // Make sure dots are drawn when shown
+        setTimeout(() => {
+          resizeCanvas();
+        }, 10);
+      }
+    }
+
+    // Main application code
+    // DOM Elements
+    const rootView = document.getElementById('root-view');
+    const internetstructureView = document.getElementById('internetstructure-view');
+    const countercultureView = document.getElementById('counterculture-view');
+    const video1Container = document.getElementById('video1');
+    const video2Container = document.getElementById('video2');
+    const video1Element = video1Container.querySelector('video');
+    const video2Element = video2Container.querySelector('video');
+    const minimizedVideo = document.getElementById('minimized-video');
+    const videosContainer = document.getElementById('videos-container');
+    
+    // Track current view and state
+    let currentView = 'root';
+    let activeVideoId = null;
+    let internetstructureInitialized = false;
+    let currentPage = 1;
+    let isAnimating = false;
+    
+    // Initialize videos
+    function initVideos() {
+      // Start playing the videos
+      video1Element.play().catch(e => console.log('Video 1 autoplay prevented:', e));
+      video2Element.play().catch(e => console.log('Video 2 autoplay prevented:', e));
+      
+      // Add loading success logging
+      video1Element.addEventListener('loadeddata', function() {
+        console.log('Video 1 loaded successfully');
+      });
+      
+      video2Element.addEventListener('loadeddata', function() {
+        console.log('Video 2 loaded successfully');
+      });
+      
+      // Add error handling
+      video1Element.addEventListener('error', function() {
+        console.error('Video 1 failed to load');
+        video1Container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#ccc;color:#333;font-size:20px;">Video 1</div>';
+      });
+      
+      video2Element.addEventListener('error', function() {
+        console.error('Video 2 failed to load');
+        video2Container.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#ccc;color:#333;font-size:20px;">Video 2</div>';
+      });
+    }
+    
+    // Update URL when switching views
+    function updateViewURL(viewName, page = null) {
+      const url = new URL(window.location);
+      url.searchParams.set('view', viewName);
+      
+      if (page && viewName === 'internetstructure') {
+        url.searchParams.set('page', page);
+      } else {
+        url.searchParams.delete('page');
+      }
+      
+      window.history.pushState({ view: viewName, page: page }, '', url);
+    }
+    
+    // Get element position for animation
+    function getElementPosition(element) {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+    
+    // Animate video movement
+    function animateVideoToCorner(videoId) {
+      if (isAnimating) return;
+      isAnimating = true;
+      
+      // Get the source video container
+      const sourceContainer = videoId === 'video1' ? video1Container : video2Container;
+      const sourceVideo = sourceContainer.querySelector('video');
+      
+      // Get the starting position of the video
+      const startPosition = getElementPosition(sourceContainer);
+      
+      // Create a clone for animation
+      const animatingClone = document.createElement('div');
+      animatingClone.className = 'video-animating';
+      animatingClone.style.width = `${startPosition.width}px`;
+      animatingClone.style.height = `${startPosition.height}px`;
+      animatingClone.style.top = `${startPosition.top}px`;
+      animatingClone.style.left = `${startPosition.left}px`;
+      animatingClone.style.borderRadius = '8px';
+      animatingClone.style.overflow = 'hidden';
+      animatingClone.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+      
+      // Clone the video
+      const videoClone = document.createElement('video');
+      videoClone.loop = true;
+      videoClone.muted = true;
+      videoClone.playsinline = true;
+      videoClone.autoplay = true;
+      videoClone.style.width = '100%';
+      videoClone.style.height = '100%';
+      videoClone.style.objectFit = 'cover';
+      
+      // Add the same source
+      const sourceElement = document.createElement('source');
+      sourceElement.src = sourceVideo.querySelector('source').src;
+      sourceElement.type = 'video/mp4';
+      videoClone.appendChild(sourceElement);
+      
+      // Add to animating clone
+      animatingClone.appendChild(videoClone);
+      
+      // Add to body
+      document.body.appendChild(animatingClone);
+      
+      // Start playing
+      videoClone.play().catch(e => console.log('Animation video play prevented:', e));
+      
+      // Get target position (where minimized video will be)
+      const targetWidth = 210; // 70% of 300px
+      const targetHeight = 210; // 70% of 300px
+      const targetTop = 20;
+      const targetLeft = 20;
+      
+      // Prepare the minimized video in advance but keep it hidden
+      minimizeVideo(videoId);
+      minimizedVideo.style.opacity = '0';
+      minimizedVideo.style.display = 'block';
+      
+      // Force reflow
+      void animatingClone.offsetWidth;
+      
+      // Start animation to corner
+      setTimeout(() => {
+        animatingClone.style.width = `${targetWidth}px`;
+        animatingClone.style.height = `${targetHeight}px`;
+        animatingClone.style.top = `${targetTop}px`;
+        animatingClone.style.left = `${targetLeft}px`;
+        
+        // When animation is 80% complete, start fading in the real minimized video
+        setTimeout(() => {
+          minimizedVideo.style.opacity = '1';
+        }, 400); // 400ms = 80% of 500ms transition
+        
+        // When animation completes
+        animatingClone.addEventListener('transitionend', () => {
+          // Remove the animating clone
+          document.body.removeChild(animatingClone);
+          
+          // Animation complete
+          isAnimating = false;
+        });
+      }, 50);
+      
+      return animatingClone;
+    }
+    
+    // Animate video back to center
+    function animateVideoToCenter(videoId) {
+      if (isAnimating) return;
+      isAnimating = true;
+      
+      // Get the target container in the root view
+      const targetContainer = videoId === 'video1' ? video1Container : video2Container;
+      
+      // Get the starting position (minimized video)
+      const startPosition = getElementPosition(minimizedVideo);
+      
+      // Get the target position (where video should end up in root view)
+      const targetPosition = getElementPosition(targetContainer);
+      
+      // Create a clone for animation
+      const animatingClone = document.createElement('div');
+      animatingClone.className = 'video-animating';
+      animatingClone.style.width = `${startPosition.width}px`;
+      animatingClone.style.height = `${startPosition.height}px`;
+      animatingClone.style.top = `${startPosition.top}px`;
+      animatingClone.style.left = `${startPosition.left}px`;
+      animatingClone.style.borderRadius = '8px';
+      animatingClone.style.overflow = 'hidden';
+      animatingClone.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+      
+      // Clone the video
+      const videoClone = document.createElement('video');
+      videoClone.loop = true;
+      videoClone.muted = true;
+      videoClone.playsinline = true;
+      videoClone.autoplay = true;
+      videoClone.style.width = '100%';
+      videoClone.style.height = '100%';
+      videoClone.style.objectFit = 'cover';
+      
+      // Add the same source
+      const sourceElement = document.createElement('source');
+      sourceElement.src = minimizedVideo.querySelector('video source').src;
+      sourceElement.type = 'video/mp4';
+      videoClone.appendChild(sourceElement);
+      
+      // Add to animating clone
+      animatingClone.appendChild(videoClone);
+      
+      // Add to body
+      document.body.appendChild(animatingClone);
+      
+      // Fade out minimized video
+      minimizedVideo.style.opacity = '0';
+      
+      // Start playing
+      videoClone.play().catch(e => console.log('Animation video play prevented:', e));
+      
+      // Force reflow
+      void animatingClone.offsetWidth;
+      
+      // Start animation to center
+      setTimeout(() => {
+        animatingClone.style.width = `${targetPosition.width}px`;
+        animatingClone.style.height = `${targetPosition.height}px`;
+        animatingClone.style.top = `${targetPosition.top}px`;
+        animatingClone.style.left = `${targetPosition.left}px`;
+        
+        // When animation completes
+        animatingClone.addEventListener('transitionend', () => {
+          // Hide minimized video completely
+          minimizedVideo.style.display = 'none';
+          minimizedVideo.style.opacity = '1';
+          minimizedVideo.innerHTML = '';
+          
+          // Remove the animating clone
+          document.body.removeChild(animatingClone);
+          
+          // Now that animation is complete, show the root videos
+          video1Element.play().catch(e => console.log('Video 1 play prevented:', e));
+          video2Element.play().catch(e => console.log('Video 2 play prevented:', e));
+          
+          // Animation complete
+          isAnimating = false;
+        });
+      }, 50);
+      
+      return animatingClone;
+    }
+    
+    // Switch to a specific view
+    function switchToView(viewName, videoId = null) {
+      // If already animating, don't allow another view switch
+      if (isAnimating) return;
+      
+      // Toggle dots background and controls based on view
+      toggleDotsControls(viewName);
+      
+      // If returning to root view and we have an active video, animate it back
+      if (viewName === 'root' && activeVideoId) {
+        // First switch to root view but hide the videos
+        document.querySelectorAll('.view').forEach(view => {
+          view.classList.remove('active');
+        });
+        
+        // Show root view
+        rootView.classList.add('active');
+        
+        // Hide videos in root view until animation completes
+        video1Container.style.visibility = 'hidden';
+        video2Container.style.visibility = 'hidden';
+        
+        // Update current view
+        currentView = 'root';
+        
+        // Update URL
+        updateViewURL('root');
+        
+        // Store active video ID before resetting
+        const tempVideoId = activeVideoId;
+        activeVideoId = null;
+        
+        // Animate the video back to center
+        const animatingClone = animateVideoToCenter(tempVideoId);
+        
+        // After animation, make videos visible again
+        setTimeout(() => {
+          video1Container.style.visibility = 'visible';
+          video2Container.style.visibility = 'visible';
+        }, 500); // Match the animation duration
+        
+        return;
+      }
+      
+      // For transitions to other views with video minimization
+      if (videoId) {
+        // First animate the video to corner
+        const animatingClone = animateVideoToCorner(videoId);
+        
+        // After animation starts, continue with view switch
+        setTimeout(() => {
+          // Hide all views
+          document.querySelectorAll('.view').forEach(view => {
+            view.classList.remove('active');
+          });
+          
+          // Show selected view
+          const targetView = document.getElementById(viewName + '-view');
+          if (targetView) {
+            targetView.classList.add('active');
+          } else {
+            // Fallback to root view if target view doesn't exist
+            rootView.classList.add('active');
+            viewName = 'root';
+          }
+          
+          // Update current view
+          currentView = viewName;
+          
+          // Update URL
+          const isFromURLHandler = new Error().stack.includes('handleURLParameters');
+          if (!isFromURLHandler) {
+            if (viewName === 'internetstructure') {
+              updateViewURL(viewName, currentPage);
+            } else {
+              updateViewURL(viewName);
+            }
+          }
+          
+          // Update active video ID
+          activeVideoId = videoId;
+          
+          // Initialize internetstructure view if needed
+          if (viewName === 'internetstructure' && !internetstructureInitialized) {
+            initializeInternetStructureView();
+            internetstructureInitialized = true;
+          }
+        }, 50);
+      } else {
+        // Standard view switch without video animation
+        // Hide all views
+        document.querySelectorAll('.view').forEach(view => {
+          view.classList.remove('active');
+        });
+        
+        // Show selected view
+        const targetView = document.getElementById(viewName + '-view');
+        if (targetView) {
+          targetView.classList.add('active');
+        } else {
+          // Fallback to root view if target view doesn't exist
+          rootView.classList.add('active');
+          viewName = 'root';
+        }
+        
+        // Update current view
+        currentView = viewName;
+        
+        // Update URL
+        const isFromURLHandler = new Error().stack.includes('handleURLParameters');
+        if (!isFromURLHandler) {
+          if (viewName === 'internetstructure') {
+            updateViewURL(viewName, currentPage);
+          } else {
+            updateViewURL(viewName);
+          }
+        }
+        
+        // Hide minimized video
+        minimizedVideo.style.display = 'none';
+        activeVideoId = null;
+        
+        // Resume playing videos in root view
+        if (viewName === 'root') {
+          video1Element.play().catch(e => console.log('Video 1 play prevented:', e));
+          video2Element.play().catch(e => console.log('Video 2 play prevented:', e));
+        }
+        
+        // Initialize internetstructure view if needed
+        if (viewName === 'internetstructure' && !internetstructureInitialized) {
+          initializeInternetStructureView();
+          internetstructureInitialized = true;
+        }
+      }
+    }
+    
+    // Minimize video to corner
+    function minimizeVideo(videoId) {
+      // Clear previous content
+      minimizedVideo.innerHTML = '';
+      
+      // Get the source video element
+      const sourceVideo = videoId === 'video1' ? video1Element : video2Element;
+      
+      // Clone the video
+      const videoClone = document.createElement('video');
+      videoClone.loop = true;
+      videoClone.muted = true;
+      videoClone.playsinline = true;
+      videoClone.autoplay = true;
+      
+      // Add the same source
+      const sourceElement = document.createElement('source');
+      sourceElement.src = sourceVideo.querySelector('source').src;
+      sourceElement.type = 'video/mp4';
+      videoClone.appendChild(sourceElement);
+      
+      // Add to minimized container
+      minimizedVideo.appendChild(videoClone);
+      
+      // Start playing
+      videoClone.play().catch(e => console.log('Minimized video play prevented:', e));
+    }
+    
+    // Set up event listeners for videos
+    function setupVideoListeners() {
+      // Video 1 click - go to internetstructure view
+      video1Container.addEventListener('click', () => {
+        switchToView('internetstructure', 'video1');
+      });
+      
+      // Video 2 click - go to counterculture view
+      video2Container.addEventListener('click', () => {
+        switchToView('counterculture', 'video2');
+      });
+      
+      // Minimized video click - return to root view
+      minimizedVideo.addEventListener('click', () => {
+        switchToView('root');
+      });
+    }
+    
+    // Handle URL parameters
+    function handleURLParameters() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const viewParam = urlParams.get('view');
+      const pageParam = urlParams.get('page');
+      
+      if (viewParam) {
+        switch(viewParam.toLowerCase()) {
+          case 'root':
+            // Make sure we don't show any minimized video
+            minimizedVideo.style.display = 'none';
+            activeVideoId = null;
+            switchToView('root', null);
+            break;
+          case 'internetstructure':
+            // Initialize internetstructure view if needed
+            if (!internetstructureInitialized) {
+              initializeInternetStructureView();
+              internetstructureInitialized = true;
+            }
+            switchToView('internetstructure', 'video1');
+            
+            // If page parameter exists, navigate to that page
+            if (pageParam) {
+              const pageNum = parseInt(pageParam, 10);
+              if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= 23) {
+                setTimeout(() => {
+                  navigateToPage(pageNum, 0, false);
+                }, 100);
+              }
+            }
+            break;
+          case 'counterculture':
+            switchToView('counterculture', 'video2');
+            break;
+          default:
+            // Default to root view for unknown parameters
+            switchToView('root', null);
+        }
+      } else if (pageParam) {
+        // If only page parameter exists, go to internetstructure view
+        if (!internetstructureInitialized) {
+          initializeInternetStructureView();
+          internetstructureInitialized = true;
+        }
+        switchToView('internetstructure', 'video1');
+        
+        // Navigate to the specified page
+        const pageNum = parseInt(pageParam, 10);
+        if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= 23) {
+          setTimeout(() => {
+            navigateToPage(pageNum, 0, false);
+          }, 100);
+        }
+      } else {
+        // Default to root view if no parameters
+        switchToView('root', null);
+      }
+    }
+    
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', (event) => {
+      if (event.state) {
+        if (event.state.view) {
+          // If we have a view in state, switch to it
+          if (event.state.view === 'internetstructure') {
+            if (!internetstructureInitialized) {
+              initializeInternetStructureView();
+              internetstructureInitialized = true;
+            }
+            switchToView('internetstructure', 'video1');
+            
+            // If we also have a page, navigate to it
+            if (event.state.page) {
+              navigateToPage(event.state.page, 0, false);
+            }
+          } else if (event.state.view === 'counterculture') {
+            switchToView('counterculture', 'video2');
+          } else {
+            switchToView('root', null);
+          }
+        } else if (event.state.page) {
+          // Legacy support for old URLs with only page parameter
+          if (!internetstructureInitialized) {
+            initializeInternetStructureView();
+            internetstructureInitialized = true;
+          }
+          switchToView('internetstructure', 'video1');
+          navigateToPage(event.state.page, 0, false);
+        }
+      } else {
+        // Default to root view if no state
+        switchToView('root');
+      }
+    });
+    
+    // Initialize internetstructure view (formerly scrolling view)
+    function initializeInternetStructureView() {
+      // Generate 23 pages dynamically
       const pageContainer = document.getElementById("page-container");
-      for (let i = 1; i <= 23; i++) { // Updated loop to 23 pages
+      pageContainer.innerHTML = ''; // Clear any existing pages
+      
+      for (let i = 1; i <= 23; i++) {
         const page = document.createElement("div");
         page.id = `page${i}`;
         page.className = "page";
@@ -294,13 +1178,13 @@
       
       // Map pages to zones (which pages belong to which zone)
       const pageToZoneMap = {
-        // Pages 1-11 are in zone 1  (Adjusted zone 1 to have more pages)
+        // Pages 1-8 are in zone 1
         1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 
-        // Pages 12-15 are in zone 2 (Zone 2 remains the same)
+        // Pages 9-15 are in zone 2
         9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1,
-        // Pages 16-18 are in zone 3 (Reduced zone 3 significantly)
+        // Pages 16-18 are in zone 3
         16: 2, 17: 2, 18: 2,
-        // Pages 19-23 are in zone 4 (Zone 4 now has pages up to 23)
+        // Pages 19-23 are in zone 4
         19: 3, 20: 3, 21: 3, 22: 3, 23: 3 
       };
       
@@ -316,7 +1200,7 @@
       const pagePositions = {};
       
       // For each zone, calculate positions with equal spacing
-      for (let page = 1; page <= 23; page++) { // Updated loop to 23 pages
+      for (let page = 1; page <= 23; page++) {
         const zoneIndex = pageToZoneMap[page];
         
         // Find all pages in this zone
@@ -329,13 +1213,11 @@
         
         // Find position of current page in the zone's page list
         const positionInZone = pagesInZone.indexOf(page);
-        const totalPagesInZone = pagesInZone.length;
         
         // Get zone start position
         const zoneStart = zonePositions[zoneIndex];
         
         // Calculate position with equal spacing between pages in the same zone
-        // Each page gets a fixed offset from the zone start
         const SPACING_PER_PAGE = 50; // Fixed spacing between pages in the same zone
         
         // Calculate position: zone start + page offset
@@ -350,7 +1232,7 @@
         if (pageParam) {
           const pageNumber = parseInt(pageParam, 10);
           // Validate page number is in range
-          if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= 23) { // Updated page count to 23
+          if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= 23) {
             return pageNumber;
           }
         }
@@ -362,10 +1244,11 @@
       function updateURLParameter(page) {
         // Create new URL with updated page parameter
         const url = new URL(window.location);
+        url.searchParams.set('view', 'internetstructure');
         url.searchParams.set('page', page);
         
         // Update URL without reloading the page
-        window.history.pushState({ page: page }, '', url);
+        window.history.pushState({ view: 'internetstructure', page: page }, '', url);
       }
       
       // Toggle debug elements visibility
@@ -422,7 +1305,7 @@
       }
       
       // Current page (1-based) - initialized from URL parameter
-      let currentPage = getInitialPage();
+      currentPage = getInitialPage();
       
       // Current zone index (0-based) - initialized based on current page
       let currentZoneIndex = pageToZoneMap[currentPage];
@@ -453,7 +1336,7 @@
         positionIndicators.innerHTML = '';
         
         // Create an indicator for each page
-        for (let page = 1; page <= 23; page++) { // Updated loop to 23 pages
+        for (let page = 1; page <= 23; page++) {
           const indicator = document.createElement("div");
           indicator.className = "position-indicator";
           indicator.id = `indicator-${page}`;
@@ -496,7 +1379,7 @@
         if (scrollingDisabled || targetPage === currentPage) return;
         
         // Validate target page
-        targetPage = Math.max(1, Math.min(23, targetPage)); // Updated page count to 23
+        targetPage = Math.max(1, Math.min(23, targetPage));
         
         scrollingDisabled = true;
         
@@ -512,11 +1395,11 @@
         }
         
         // Update page container position
-        pageContainer.style.transition = `transform ${duration}ms ease-out`;
+        pageContainer.style.transition = duration > 0 ? `transform ${duration}ms ease-out` : 'none';
         pageContainer.style.transform = `translateX(-${(currentPage - 1) * 100}vw)`;
         
         // Update page number display
-        pageNumber.textContent = `Page ${currentPage} / 23`; // Updated page count to 23
+        pageNumber.textContent = `Page ${currentPage} / 23`;
         
         // Get the zone for the current page
         const newZoneIndex = pageToZoneMap[currentPage];
@@ -540,13 +1423,13 @@
         // Check if zone has changed
         if (newZoneIndex !== previousZone) {
             // Update zone text with animation
-            updateZoneText(newZoneIndex, true);
+            updateZoneText(newZoneIndex, duration > 0);
             
             // Special case for transition between zones 2 and 3
-            if ((previousZone === 1 && newZoneIndex === 2) ||
-                (previousZone === 2 && newZoneIndex === 1)) {
+            if (duration > 0 && ((previousZone === 1 && newZoneIndex === 2) ||
+                (previousZone === 2 && newZoneIndex === 1))) {
               imageDuration = 3000; // Longer transition between zones 2 and 3
-            } else {
+            } else if (duration > 0) {
               imageDuration = defaultDuration; // Default for zone transitions
             }
             
@@ -563,17 +1446,6 @@
           scrollingDisabled = false;
         }, Math.max(duration, imageDuration));
       }
-      
-      // Handle browser back/forward buttons
-      window.addEventListener('popstate', (event) => {
-        if (event.state && event.state.page) {
-          // Navigate to the page from history state without updating URL
-          navigateToPage(event.state.page, 500, false);
-        } else {
-          // If no state, assume page 1
-          navigateToPage(1, 500, false);
-        }
-      });
       
       // Handle both wheel and touch events
       function setupEventListeners() {
@@ -662,7 +1534,7 @@
             
             // Limit pages to move based on available pages
             if (deltaX > 0) { // Swipe left (move forward)
-              pagesToMove = Math.min(pagesToMove, 23 - currentPage); // Updated page count to 23
+              pagesToMove = Math.min(pagesToMove, 23 - currentPage);
             } else { // Swipe right (move backward)
               pagesToMove = Math.min(pagesToMove, currentPage - 1);
             }
@@ -718,7 +1590,7 @@
         const direction = deltaX > 0 ? 1 : -1; // 1 for forward, -1 for backward
         
         // Calculate target page
-        const targetPage = Math.max(1, Math.min(23, currentPage + (direction * pagesToMove))); // Updated page count to 23
+        const targetPage = Math.max(1, Math.min(23, currentPage + (direction * pagesToMove)));
         
         // If page would change, update everything
         if (targetPage !== currentPage) {
@@ -741,7 +1613,7 @@
         // Calculate target page based on scroll direction
         let targetPage = currentPage;
         
-        if (e.deltaY > 0 && currentPage < 23) { // Updated page count to 23
+        if (e.deltaY > 0 && currentPage < 23) {
           targetPage = currentPage + 1;
         } else if (e.deltaY < 0 && currentPage > 1) {
           targetPage = currentPage - 1;
@@ -755,8 +1627,8 @@
       
       function triggerTransition(targetX, duration) {
         // Apply transition to the image and indicators
-        navImg.style.transition = `transform ${duration}ms ease-out`;
-        positionIndicators.style.transition = `transform ${duration}ms ease-out`;
+        navImg.style.transition = duration > 0 ? `transform ${duration}ms ease-out` : 'none';
+        positionIndicators.style.transition = duration > 0 ? `transform ${duration}ms ease-out` : 'none';
         
         // Apply the transform to the image and indicators
         navImg.style.transform = `translateX(${targetX}px)`;
@@ -765,13 +1637,15 @@
         // Update position display
         imagePosition.textContent = `Image Position: ${Math.round(targetX)}px`;
         
-        setTimeout(() => {
-          navImg.style.transition = "";
-          positionIndicators.style.transition = "";
-        }, duration);
+        if (duration > 0) {
+          setTimeout(() => {
+            navImg.style.transition = "";
+            positionIndicators.style.transition = "";
+          }, duration);
+        }
       }
       
-      // Initialize event listeners, indicators, and set initial page
+      // Initialize internetstructure view components
       function initialize() {
         createPositionIndicators();
         createZoneTextElements();
@@ -795,7 +1669,7 @@
           positionIndicators.style.transform = `translateX(${pagePositions[currentPage]}px)`;
           
           // Update displays
-          pageNumber.textContent = `Page ${currentPage} / 23`; // Updated page count to 23
+          pageNumber.textContent = `Page ${currentPage} / 23`;
           pageInfo.textContent = `Page: ${currentPage}, Zone: ${currentZoneIndex + 1}`;
           imagePosition.textContent = `Image Position: ${Math.round(pagePositions[currentPage])}px`;
           
@@ -814,9 +1688,6 @@
           // Update the current indicator
           updateCurrentIndicator();
         }
-        
-        // Initialize browser history state
-        window.history.replaceState({ page: currentPage }, '', window.location.href);
       }
       
       // Handle window resize to update mobile/desktop mode
@@ -830,8 +1701,32 @@
         
         // Recreate indicators with proper positioning
         createPositionIndicators();
+        
+        // Redraw dots when window is resized
+        resizeCanvas();
       });
       
-      // Initialize when the page loads
-      window.addEventListener("load", initialize);
-    </script>
+      // Make navigateToPage function available globally
+      window.navigateToPage = navigateToPage;
+      
+      // Initialize the internetstructure view
+      initialize();
+    }
+    
+    // Initialize everything
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize videos
+      initVideos();
+      
+      // Setup video click handlers
+      setupVideoListeners();
+      
+      // Handle URL parameters
+      handleURLParameters();
+      
+      // Initially hide dots background and controls in root view
+      toggleDotsControls('root');
+    });
+  </script>
+</body>
+</html>
